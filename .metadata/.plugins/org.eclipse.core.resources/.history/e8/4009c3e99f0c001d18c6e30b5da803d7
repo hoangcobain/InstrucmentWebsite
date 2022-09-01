@@ -1,0 +1,85 @@
+package com.website.controller.web;
+
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+
+import javax.inject.Inject;
+import javax.servlet.ServletException;
+import javax.servlet.annotation.WebServlet;
+import javax.servlet.http.HttpServlet;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+
+import com.website.model.ItemModel;
+import com.website.model.OrderModel;
+import com.website.model.ProductModel;
+import com.website.service.IProductService;
+import com.website.utils.FormUtil;
+import com.website.utils.SessionUtil;
+
+@WebServlet(urlPatterns = { "/add-cart" })
+public class AddCartProductController extends HttpServlet {
+
+	private static final long serialVersionUID = 1L;
+
+	@Inject
+	private IProductService productService;
+
+	protected void doGet(HttpServletRequest request, HttpServletResponse response)
+			throws ServletException, IOException {
+		int quantity = 1;
+		ProductModel model = FormUtil.toModel(ProductModel.class, request);
+		model = productService.findOne(model.getId());
+		if (model != null) {
+			if (request.getParameter("quantity") != null) {
+				quantity = Integer.parseInt(request.getParameter("quantity"));
+			}
+			if (SessionUtil.getInstance().getValue(request, "order") == null) {
+				OrderModel orderModel = new OrderModel();
+				List<ItemModel> listItems = new ArrayList<ItemModel>();
+				ItemModel itemModel = new ItemModel();
+				itemModel.setProduct(model);
+				itemModel.setQuantity(quantity);
+				itemModel.setPrice(model.getPrice());
+				listItems.add(itemModel);
+				orderModel.setLists(listItems);
+				SessionUtil.getInstance().putValue(request, "order", listItems);
+//				SessionUtil.getInstance().putValue(request, "itemModel", itemModel);
+			} else {
+//				ItemModel itemModel = (ItemModel) SessionUtil.getInstance().getValue(request, "itemModel");
+				OrderModel orderModel = (OrderModel) SessionUtil.getInstance().getValue(request, "order");
+				List<ItemModel> list = orderModel.getLists();
+				boolean check = false;
+				for (ItemModel items : list) {
+					if (items.getProduct().getId() == model.getId()) {
+						items.setQuantity(items.getQuantity() + quantity);
+						check = true;
+					}
+				}
+				if (check == false) {
+					ItemModel item = new ItemModel();
+					item.setProduct(model);
+					item.setQuantity(quantity);
+					item.setPrice(model.getPrice());
+					list.add(item);
+					SessionUtil.getInstance().putValue(request, "itemModel2", item);
+				}
+				SessionUtil.getInstance().putValue(request, "order", orderModel);
+//				SessionUtil.getInstance().putValue(request, "itemModel", itemModel);
+			}
+		}
+		response.sendRedirect(request.getContextPath() + "/homepage" + "?page=1&maxPageItem=6");
+	}
+	
+	protected void doPost(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
+		int idOrder;
+		if (request.getParameter("id") != null) {
+			idOrder = Integer.parseInt(request.getParameter("id"));
+		}
+		SessionUtil.getInstance().removeValue(request, "idOrder");
+		response.sendRedirect(request.getContextPath() + "/order");
+		
+
+	}
+}

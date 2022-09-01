@@ -1,0 +1,90 @@
+package com.website.controller.web;
+
+import java.io.IOException;
+import java.util.Map;
+import java.util.ResourceBundle;
+
+import javax.inject.Inject;
+import javax.servlet.RequestDispatcher;
+import javax.servlet.ServletException;
+import javax.servlet.annotation.WebServlet;
+import javax.servlet.http.HttpServlet;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+
+import com.website.constant.SystemConstant;
+import com.website.model.Cart;
+import com.website.model.ProductModel;
+import com.website.model.UserModel;
+import com.website.paging.PageRequest;
+import com.website.paging.Pageble;
+import com.website.service.IProductService;
+import com.website.service.IUserService;
+import com.website.utils.CountCart;
+import com.website.utils.FormUtil;
+import com.website.utils.SessionUtil;
+
+@WebServlet(urlPatterns = { "/homepage", "/login", "/logout" })
+public class HomeController extends HttpServlet {
+
+	private static final long serialVersionUID = 1L;
+	ResourceBundle myBundle = ResourceBundle.getBundle("message");
+
+	@Inject
+	private IUserService userService;
+
+	@Inject
+	private IProductService productService;
+
+	protected void doGet(HttpServletRequest request, HttpServletResponse response)
+			throws ServletException, IOException {
+		ProductModel model = FormUtil.toModel(ProductModel.class, request);
+		Pageble pageble = new PageRequest();
+		model.setListResult(productService.findAll(pageble));
+//		model.setListResult(productService.findAllProductBestSeller());
+
+//		model.setTotalItem(productService.getTotalItem());
+//		model.setTotalPage((int) Math.ceil((double) model.getTotalItem()/model.getMaxPageItem()));
+		request.setAttribute(SystemConstant.MODEL, model);
+		request.setAttribute("cartCount",
+				CountCart.countCart((Map<Long, Cart>) SessionUtil.getInstance().getValue(request, "cart")));
+
+		String action = request.getParameter("action");
+		if (action != null && action.equals("login")) {
+			String message = request.getParameter("message");
+			String alert = request.getParameter("alert");
+			if (message != null && alert != null) {
+				request.setAttribute("message", myBundle.getString(message));
+				request.setAttribute("alert", alert);
+			}
+			RequestDispatcher rd = request.getRequestDispatcher("/views/login.jsp");
+			rd.forward(request, response);
+		} else if (action != null && action.equals("logout")) {
+			SessionUtil.getInstance().removeValue(request, "USERMODEL");
+			response.sendRedirect(request.getContextPath() + "/homepage");
+		} else {
+			RequestDispatcher rd = request.getRequestDispatcher("/views/web/home.jsp");
+			rd.forward(request, response);
+		}
+	}
+
+	protected void doPost(HttpServletRequest request, HttpServletResponse response)
+			throws ServletException, IOException {
+		String action = request.getParameter("action");
+		if (action != null && action.equals("login")) {
+			UserModel model = FormUtil.toModel(UserModel.class, request);
+			model = userService.findByUserNameAndPasswordAndStatus(model.getUserName(), model.getPassword());
+			if (model != null) {
+				SessionUtil.getInstance().putValue(request, "USERMODEL", model);
+				if (model.getRole().getCode().equals("USER")) {
+					response.sendRedirect(request.getContextPath() + "/homepage");
+				} else if (model.getRole().getCode().equals("ADMIN")) {
+					response.sendRedirect(request.getContextPath() + "/admin/homepage");
+				}
+			} else {
+				if (model == null && )
+				response.sendRedirect(request.getContextPath() + "/login?action=login&message=username_password_invalid&alert=danger");
+			}
+		}
+	}
+}
